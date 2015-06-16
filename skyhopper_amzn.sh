@@ -17,6 +17,15 @@ function check_result {
     fi
 }
 
+function check_exec_user {
+    local uid=$(id | sed 's/uid=\([0-9]*\)(.*/\1/')
+    if [ $uid -ne 500 ]; then
+        check_result 1 "Check exec user (exec with ec2-user please)"
+    else
+        check_result 0 "Check exec user"
+    fi
+}
+
 function check_supported {
     local my_version=$(cat /etc/system-release)
     local supported=$(cat <<EOL
@@ -46,36 +55,41 @@ EOL
 # MAIN
 # #####
 
+# check user
+echo "実行ユーザをチェックします"
+check_exec_user
+
 # check version
 echo "OSが動作確認バージョンか確認します"
 check_supported
 
 ## yum update
 echo "yum update及びreleasever固定を行います"
-yum update -y >/dev/null
+sudo yum update -y >/dev/null
 check_result $? "yum update"
-sed  -e 's/.*\([0-9]\{4\}\.[0-9]\{2\}\)$/\1/' /etc/system-release > /etc/yum/vars/releasever
-yum clean all
+sudo sh -c "sed -e 's/.*\([0-9]\{4\}\.[0-9]\{2\}\)$/\1/' /etc/system-release > /etc/yum/vars/releasever"
+check_result $? "releasever固定"
+sudo yum clean all
 
 # gitをインストールしています
 echo "gitをインストールしています"
-yum install -y git
+sudo yum install -y git
 check_result $? "git インストール"
 
 # Chefをインストールしています
 echo "Chefをインストールしています"
-curl -L https://www.chef.io/chef/install.sh | bash
+curl -L https://www.chef.io/chef/install.sh | sudo bash
 check_result $? "Chef インストール"
 
 # SkyHopperインストール用Cookbookを取得しています
 echo "SkyHopperインストール用Cookbookを取得しています"
 
 cd /usr/local/src
-rm -rf /usr/local/src/skyhopper_cookbooks
-git clone https://github.com/skyarch-networks/skyhopper_cookbooks.git
+sudo rm -rf /usr/local/src/skyhopper_cookbooks
+sudo git clone https://github.com/skyarch-networks/skyhopper_cookbooks.git
 check_result $? "SkyHopper git clone"
 
-tee /usr/local/src/skyhopper_cookbooks/cookbooks/skyhopper.json <<EOF >/dev/null
+sudo tee /usr/local/src/skyhopper_cookbooks/cookbooks/skyhopper.json <<EOF >/dev/null
 {
   "run_list": "recipe[skyhopper::default]"
 }
@@ -83,30 +97,39 @@ EOF
 
 # SkyHopper用初期設定を実行しています
 echo "SkyHopperインストールChefを実行しています"
-chef-client -z -j /usr/local/src/skyhopper_cookbooks/cookbooks/skyhopper.json
+cd /usr/local/src/skyhopper_cookbooks/cookbooks
+sudo chef-client -z -j skyhopper.json
 check_result $? "SkyHopper install Chef exec"
 
 # MySQL ユーザーの作成
-echo "MySQL を設定しています"
+echo -e "\033[0;31m ※本番環境ではMySQLユーザ設定をこのまま利用しないで下さい ※本番環境ではMySQLユーザ設定をこのまま利用しないで下さい ※本番環境ではMySQLユーザ設定をこのまま利用しないで下さい \033[0;39m"
+echo "MySQL ユーザを作成しています"
 
-tee /usr/local/src/skyhopper_cookbooks/cookbooks/skyhopper_init.sql <<EOF >/dev/null
+sudo tee /usr/local/src/skyhopper_cookbooks/cookbooks/skyhopper_init.sql <<EOF >/dev/null
 -- development
+GRANT USAGE ON *.* TO 'skyhopper_dev'@'localhost';
+DROP USER 'skyhopper_dev'@'localhost';
 CREATE USER 'skyhopper_dev'@'localhost' IDENTIFIED BY 'hogehoge';
 GRANT CREATE, SHOW DATABASES ON *.* TO 'skyhopper_dev'@'localhost';
 GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, INDEX, ALTER, LOCK TABLES ON \`SkyHopperDevelopment\`.* TO 'skyhopper_dev'@'localhost';
 
 -- production
 SET storage_engine=INNODB;
+GRANT USAGE ON *.* TO 'skyhopper_prod'@'localhost';
+DROP USER 'skyhopper_prod'@'localhost';
 CREATE USER 'skyhopper_prod'@'localhost' IDENTIFIED BY 'fugafuga';
 CREATE DATABASE IF NOT EXISTS \`SkyHopperProduction\` DEFAULT CHARACTER SET \`utf8\` COLLATE \`utf8_unicode_ci\`;
 GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, INDEX, ALTER, LOCK TABLES ON \`SkyHopperProduction\`.* TO 'skyhopper_prod'@'localhost';
+
+flush privileges;
 EOF
 
-mysql -u root -f /usr/local/src/skyhopper_cookbooks/cookbooks/skyhopper_init.sql
+mysql -u root < /usr/local/src/skyhopper_cookbooks/cookbooks/skyhopper_init.sql
 check_result $? "DB initialized"
+echo -e "\033[0;31m ※本番環境ではMySQLユーザ設定をこのまま利用しないで下さい ※本番環境ではMySQLユーザ設定をこのまま利用しないで下さい ※本番環境ではMySQLユーザ設定をこのまま利用しないで下さい \033[0;39m"
 
 # SkyHopper のセットアップ
-cd skyhopper
+cd ~/skyhopper
 
 # bundle install
 echo "bundle install しています"
@@ -170,7 +193,7 @@ echo "サービス を起動しています"
 check_result $? "SkyHopper started"
 
 # SkyHopper の初期設定
-IP=`curl http://ifconfig.me`
+IP=$(curl --silent http://169.254.169.254/latest/meta-data/public-ipv4)
 echo "ブラウザから http://${IP} にアクセスし、SkyHopperの初期設定を行ってください"
 echo "上記が終了後にEnterを押してください"
 read TEST
