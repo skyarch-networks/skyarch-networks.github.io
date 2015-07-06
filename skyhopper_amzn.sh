@@ -196,7 +196,7 @@ check_result $? "SkyHopper started"
 IP=$(curl --silent http://169.254.169.254/latest/meta-data/public-ipv4)
 echo "ブラウザから http://${IP} にアクセスし、SkyHopperの初期設定を行ってください"
 echo "上記が終了後にEnterを押してください"
-read TEST
+read -s -n 1 TEST < /dev/tty
 
 # Chef Server の鍵を設置
 echo "鍵 を作成しています"
