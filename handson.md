@@ -185,7 +185,7 @@ end
 ## AmazonLinuxで現在のインスタンスサイズを取得
 
 ```bash
-# curl http://169.254.169.254/latest/meta-data/instance-type
+# curl http://169.254.169.254/latest/meta-data/instance-type
 ```
 
 ## デフォルトで利用できるリソース
@@ -250,7 +250,7 @@ puts client.host.create(
 ```ruby
 require 'sky_zabbix'
 
-zabbix_url  = 'http://ZabbixサーバIP/zabbix/api_jsonrpc.php'
+zabbix_url  = 'http://ec2-xx-xx-xx-xx.ap-northeast-1.compute.amazonaws.com/zabbix/api_jsonrpc.php'
 zabbix_user = 'admin'
 zabbix_pass = 'ilikerandompasswords'
 
