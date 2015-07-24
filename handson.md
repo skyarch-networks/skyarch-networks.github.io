@@ -175,6 +175,7 @@ end
 ```
 
 ## コマンド実行リソース
+
 ```ruby
 describe command('実行するコマンド') do
   its(:stdout) { should match /正規表現パターン/ }
@@ -246,7 +247,7 @@ puts client.host.create(
 
 ## API経由でアイテムを作成するコード
 
-```
+```ruby
 require 'sky_zabbix'
 
 zabbix_url  = 'http://ZabbixサーバIP/zabbix/api_jsonrpc.php'
