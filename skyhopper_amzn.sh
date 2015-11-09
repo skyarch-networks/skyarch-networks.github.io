@@ -1,7 +1,7 @@
 #!/bin/sh
 
 #
-# SkyHopper Install by Skyarchnetworks
+# SkyHopper one-liner installer by Skyarchnetworks
 #
 
 ## CommonFunction
@@ -30,6 +30,7 @@ function check_supported {
     local my_version=$(cat /etc/system-release)
     local supported=$(cat <<EOL
 Amazon Linux AMI release 2015.03
+Amazon Linux AMI release 2015.09
 EOL
     )
 
@@ -138,8 +139,21 @@ check_result $? "bundle install"
 
 # bower install
 echo "bower install しています"
-echo "n" | bower install -s > /dev/null 2>&1
+bower install -s > /dev/null 2>&1
 check_result $? "bower install"
+
+# TypeScriptコンパイル
+echo "TypeScriptをコンパイルしています"
+sudo npm i -g gulp > /dev/null 2>&1
+check_result $? "gulp install"
+cd frontend/
+npm i > /dev/null 2>&1
+check_result $? "npm init"
+gulp tsd > /dev/null 2>&1
+check_result $? "gulp tsd"
+gulp ts > /dev/null 2>&1
+check_result $? "gulp ts"
+cd ../../skyhopper/
 
 # database.yml
 echo "database.yml を設定しています"
@@ -189,8 +203,13 @@ check_result $? "DB seed production"
 
 # 起動
 echo "サービス を起動しています"
+if [ ! -d ./tmp/pids ]; then
+  mkdir ./tmp/pids
+fi
 ./scripts/skyhopper_daemon.sh start > /dev/null 2>&1
-check_result $? "SkyHopper started"
+echo "起動まで 1分間待ちます"
+sleep 180
+check_result $? "SkyHopper (maybe) started"
 
 # SkyHopper の初期設定
 IP=$(curl --silent http://169.254.169.254/latest/meta-data/public-ipv4)
